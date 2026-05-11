@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hue & You</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --pink:#D4537E;--pink-light:#FBEAF0;--pink-dark:#993556;
+    --bg:#0d0d0d;--surface:#1a1a1a;--surface2:#242424;
+    --border:rgba(255,255,255,0.08);--text:rgba(255,255,255,0.92);
+    --muted:rgba(255,255,255,0.45);--hint:rgba(255,255,255,0.22);
+  }
+  html,body{height:100%;overflow:hidden}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100dvh}
+
+  /* ── SCREENS ── */
+  .screen{display:none;flex-direction:column;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .screen.active{display:flex}
+
+  /* ── HEADER ── */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;flex-shrink:0}
+  .logo{font-size:18px;font-weight:400;letter-spacing:.04em}
+  .logo span{color:var(--pink)}
+  .back-btn{display:flex;align-items:center;gap:5px;font-size:14px;color:var(--muted);background:none;border:none;cursor:pointer;padding:6px 0}
+
+  /* ── STEP INDICATOR ── */
+  .steps{display:flex;align-items:center;gap:0;padding:0 20px 16px;flex-shrink:0}
+  .step-dot{width:24px;height:24px;border-radius:50%;border:1px solid var(--hint);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--hint);flex-shrink:0}
+  .step-dot.done{background:var(--pink);border-color:var(--pink);color:#fff}
+  .step-dot.cur{border-color:var(--pink);color:var(--pink)}
+  .step-line{flex:1;height:1px;background:var(--hint)}
+  .step-line.done{background:var(--pink)}
+
+  /* ── UPLOAD SCREEN ── */
+  #s-upload{padding:0 20px 32px}
+  .upload-area{border:1px dashed rgba(255,255,255,0.18);border-radius:20px;padding:40px 20px;text-align:center;cursor:pointer;margin-bottom:20px;position:relative;overflow:hidden}
+  .upload-area:active{background:var(--surface)}
+  #preview-img{width:100%;max-height:300px;object-fit:cover;border-radius:16px;display:none;margin-bottom:16px}
+  .upload-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+  .upload-title{font-size:16px;font-weight:500;margin-bottom:6px}
+  .upload-sub{font-size:13px;color:var(--muted)}
+  #file-input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+  /* ── BUTTONS ── */
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:14px;font-size:16px;font-weight:500;border:none;cursor:pointer;transition:opacity .15s,transform .1s}
+  .btn:active{transform:scale(0.98);opacity:.9}
+  .btn-primary{background:var(--pink);color:#fff}
+  .btn-secondary{background:var(--surface2);color:var(--text)}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn:disabled{opacity:.35;pointer-events:none}
+
+  /* ── API KEY SETUP ── */
+  .api-card{background:var(--surface);border-radius:16px;padding:16px;margin-bottom:20px}
+  .api-card label{font-size:12px;color:var(--muted);display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+  .api-card input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:monospace}
+  .api-card input:focus{border-color:var(--pink)}
+  .api-note{font-size:12px;color:var(--hint);margin-top:8px;line-height:1.5}
+
+  /* ── ANALYSIS SCREEN ── */
+  #s-analysis{padding:0 20px 32px}
+  .analyzing-state{text-align:center;padding:40px 0}
+  .pulse-ring{width:80px;height:80px;border-radius:50%;border:2px solid var(--pink);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.7}}
+  .analyzing-text{font-size:16px;font-weight:500;margin-bottom:6px}
+  .analyzing-sub{font-size:13px;color:var(--muted)}
+
+  .result-photo{width:100%;max-height:200px;object-fit:cover;border-radius:16px;margin-bottom:16px}
+  .season-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(212,83,126,0.15);border:1px solid rgba(212,83,126,0.3);border-radius:30px;font-size:14px;color:#F4C0D1;margin-bottom:16px}
+  .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+  .result-card{background:var(--surface);border-radius:14px;padding:14px}
+  .result-card-title{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:10px}
+  .swatch-wrap{display:flex;gap:6px;flex-wrap:wrap}
+  .swatch{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,0.1)}
+  .trait-wrap{display:flex;flex-wrap:wrap;gap:5px}
+  .trait{font-size:11px;padding:3px 9px;border-radius:12px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+  .ai-desc{background:var(--surface);border-radius:14px;padding:14px;margin-bottom:16px;font-size:14px;color:rgba(255,255,255,0.7);line-height:1.6}
+
+  /* ── SHOP SCREEN ── */
+  #s-shop{padding:0 20px 32px}
+  .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+  .cat-card{background:var(--surface);border-radius:14px;padding:16px;cursor:pointer;border:1px solid transparent;transition:border-color .15s,background .15s}
+  .cat-card:active{background:var(--surface2)}
+  .cat-card.sel{border-color:var(--pink);background:rgba(212,83,126,0.08)}
+  .cat-icon{font-size:26px;margin-bottom:8px}
+  .cat-name{font-size:14px;font-weight:500}
+  .cat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+  .chip{padding:7px 14px;border-radius:20px;font-size:13px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s}
+  .chip.sel{border-color:var(--pink);background:rgba(212,83,126,0.15);color:#F4C0D1}
+
+  /* ── PRODUCTS SCREEN ── */
+  #s-products{padding:0 20px 32px}
+  .searching-state{text-align:center;padding:40px 0}
+  .product-list{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+  .product-item{background:var(--surface);border-radius:16px;padding:14px;display:flex;gap:12px;align-items:center;cursor:pointer;border:1px solid transparent;transition:border-color .15s}
+  .product-item:active{background:var(--surface2)}
+  .product-item.sel{border-color:var(--pink)}
+  .product-color-preview{width:52px;height:52px;border-radius:12px;flex-shrink:0;border:1px solid rgba(255,255,255,0.08)}
+  .product-info{flex:1;min-width:0}
+  .product-brand{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);margin-bottom:2px}
+  .product-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .product-shade{font-size:12px;color:var(--muted);margin-top:2px}
+  .product-price{font-size:15px;font-weight:500;color:var(--pink);flex-shrink:0}
+  .match-badge{font-size:10px;padding:2px 7px;border-radius:8px;background:rgba(125,239,168,0.12);color:#7DEFA8;border:1px solid rgba(125,239,168,0.2);margin-top:4px;display:inline-block}
+
+  /* ── AR SCREEN ── */
+  #s-ar{position:relative;overflow:hidden}
+  #ar-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  #ar-canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);pointer-events:none}
+  .ar-overlay-top{position:absolute;top:0;left:0;right:0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(0,0,0,0.6),transparent);z-index:10}
+  .ar-status{font-size:12px;padding:5px 12px;border-radius:20px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.7)}
+  .ar-status.on{color:#7DEFA8;border-color:rgba(125,239,168,0.3)}
+  .ar-overlay-bottom{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,0.85) 70%,transparent);padding:20px 20px 36px;z-index:10}
+  .ar-product-name{font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:4px}
+  .ar-shade-name{font-size:18px;font-weight:500;margin-bottom:14px}
+  .ar-color-row{display:flex;gap:10px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;scrollbar-width:none}
+  .ar-color-row::-webkit-scrollbar{display:none}
+  .ar-swatch{width:38px;height:38px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .15s}
+  .ar-swatch.sel{border-color:#fff;transform:scale(1.18)}
+  .ar-intensity{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .ar-intensity label{font-size:12px;color:var(--muted);flex-shrink:0;width:60px}
+  .ar-intensity input{flex:1;accent-color:var(--pink)}
+  .ar-intensity span{font-size:12px;color:var(--muted);width:32px;text-align:right}
+  .ar-loading{position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20}
+  .ar-loading p{font-size:14px;color:var(--muted)}
+  .spinner{width:36px;height:36px;border:2px solid rgba(255,255,255,0.08);border-top-color:var(--pink);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── UTILS ── */
+  .screen-title{font-size:22px;font-weight:500;padding:4px 20px 4px;flex-shrink:0}
+  .screen-sub{font-size:14px;color:var(--muted);padding:4px 20px 16px;flex-shrink:0;line-height:1.5}
+  .spacer{flex:1}
+  .px20{padding-left:20px;padding-right:20px}
+  .mb12{margin-bottom:12px}
+  .error-msg{background:rgba(226,75,74,0.12);border:1px solid rgba(226,75,74,0.25);border-radius:12px;padding:12px 14px;font-size:13px;color:#F09595;margin-bottom:16px;display:none}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════ SCREEN 1: UPLOAD ═══════════════════════════════════ -->
+<div class="screen active" id="s-upload">
+  <div class="topbar">
+    <div class="logo"><span>✦</span> Hue &amp; You</div>
+  </div>
+  <div class="steps">
+    <div class="step-dot cur" id="sd1">1</div>
+    <div class="step-line" id="sl1"></div>
+    <div class="step-dot" id="sd2">2</div>
+    <div class="step-line" id="sl2"></div>
+    <div class="step-dot" id="sd3">3</div>
+    <div class="step-line" id="sl3"></div>
+    <div class="step-dot" id="sd4">4</div>
+  </div>
+
+  <div class="screen-title">Your photo</div>
+  <div class="screen-sub">A clear selfie with natural light works best.</div>
+
+  <div style="padding:0 20px;flex:1;overflow-y:auto">
+    <img id="preview-img" src="" alt="Preview">
+    <div class="upload-area" id="upload-area">
+      <input type="file" id="file-input" accept="image/*" capture="user">
+      <div id="upload-placeholder">
+        <div class="upload-icon">📸</div>
+        <div class="upload-title">Tap to take or upload a photo</div>
+        <div class="upload-sub">Used only for AI color analysis</div>
+      </div>
+    </div>
+
+    <div class="api-card">
+      <label>Anthropic API Key</label>
+      <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <div class="api-note">Your key is used directly from your browser — never stored or sent to any server other than Anthropic. Get one at console.anthropic.com</div>
+    </div>
+
+    <div class="error-msg" id="upload-error"></div>
+  </div>
+
+  <div style="padding:16px 20px 36px;flex-shrink:0">
+    <button class="btn btn-primary" id="analyze-btn" disabled onclick="startAnalysis()">
+      ✦ Analyze my colors
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN 2: ANALYSIS ═══════════════════════════════════ -->
+<div class="screen" id="s-analysis">
+  <div class="topbar">
+    <div class="logo"><span>✦</span> Hue &amp; You</div>
+    <button class="back-btn" onclick="goTo('s-upload')">← Back</button>
+  </div>
+  <div class="steps">
+    <div class="step-dot done">✓</div>
+    <div class="step-line done"></div>
+    <div class="step-dot cur">2</div>
+    <div class="step-line"></div>
+    <div class="step-dot">3</div>
+    <div class="step-line"></div>
+    <div class="step-dot">4</div>
+  </div>
+
+  <div style="padding:0 20px;flex:1;overflow-y:auto" id="analysis-content">
+    <div class="analyzing-state" id="analyzing-state">
+      <div class="pulse-ring">✦</div>
+      <div class="analyzing-text">Analyzing your colors…</div>
+      <div class="analyzing-sub" id="analysis-status">Reading skin tone & undertones</div>
+    </div>
+    <div id="analysis-result" style="display:none">
+      <img id="result-photo" class="result-photo" src="" alt="Your photo">
+      <div id="season-badge-wrap"></div>
+      <div id="ai-desc-wrap"></div>
+      <div class="result-grid" id="result-grid"></div>
+      <div class="error-msg" id="analysis-error"></div>
+    </div>
+  </div>
+
+  <div style="padding:16px 20px 36px;flex-shrink:0" id="analysis-cta" style="display:none">
+    <button class="btn btn-primary" onclick="goTo('s-shop')">Shop my palette →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN 3: SHOP ═══════════════════════════════════ -->
+<div class="screen" id="s-shop">
+  <div class="topbar">
+    <div class="logo"><span>✦</span> Hue &amp; You</div>
+    <button class="back-btn" onclick="goTo('s-analysis')">← Back</button>
+  </div>
+  <div class="steps">
+    <div class="step-dot done">✓</div>
+    <div class="step-line done"></div>
+    <div class="step-dot done">✓</div>
+    <div class="step-line done"></div>
+    <div class="step-dot cur">3</div>
+    <div class="step-line"></div>
+    <div class="step-dot">4</div>
+  </div>
+
+  <div class="screen-title">What are you shopping for?</div>
+  <div style="padding:0 20px;flex:1;overflow-y:auto">
+    <div class="cat-grid" style="margin-bottom:16px">
+      <div class="cat-card sel" id="cat-makeup" onclick="selectCat('makeup')">
+        <div class="cat-icon">💄</div>
+        <div class="cat-name">Makeup</div>
+        <div class="cat-sub">Lips, eyes, face</div>
+      </div>
+      <div class="cat-card" id="cat-fashion" onclick="selectCat('fashion')">
+        <div class="cat-icon">👗</div>
+        <div class="cat-name">Fashion</div>
+        <div class="cat-sub">Clothing & accessories</div>
+      </div>
+      <div class="cat-card" id="cat-hair" onclick="selectCat('hair')">
+        <div class="cat-icon">✂️</div>
+        <div class="cat-name">Hair</div>
+        <div class="cat-sub">Color & care</div>
+      </div>
+      <div class="cat-card" id="cat-skincare" onclick="selectCat('skincare')">
+        <div class="cat-icon">🌿</div>
+        <div class="cat-name">Skincare</div>
+        <div class="cat-sub">Foundation-ready skin</div>
+      </div>
+    </div>
+
+    <div id="chip-section">
+      <div style="font-size:12px;color:var(--hint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Subcategory</div>
+      <div class="chip-row" id="chip-row"></div>
+    </div>
+
+    <div class="error-msg" id="shop-error"></div>
+  </div>
+
+  <div style="padding:16px 20px 36px;flex-shrink:0">
+    <button class="btn btn-primary" onclick="findProducts()">Find my products →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN 4: PRODUCTS ═══════════════════════════════════ -->
+<div class="screen" id="s-products">
+  <div class="topbar">
+    <div class="logo"><span>✦</span> Hue &amp; You</div>
+    <button class="back-btn" onclick="goTo('s-shop')">← Back</button>
+  </div>
+  <div class="steps">
+    <div class="step-dot done">✓</div>
+    <div class="step-line done"></div>
+    <div class="step-dot done">✓</div>
+    <div class="step-line done"></div>
+    <div class="step-dot done">✓</div>
+    <div class="step-line done"></div>
+    <div class="step-dot cur">4</div>
+  </div>
+
+  <div style="padding:0 20px;flex:1;overflow-y:auto">
+    <div class="searching-state" id="searching-state">
+      <div class="spinner" style="margin:0 auto 16px"></div>
+      <div style="font-size:16px;font-weight:500;margin-bottom:6px">Matching your palette…</div>
+      <div style="font-size:13px;color:var(--muted)" id="search-status">Finding perfect shades</div>
+    </div>
+    <div id="products-result" style="display:none">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:14px" id="products-subtitle"></div>
+      <div class="product-list" id="product-list"></div>
+      <div class="error-msg" id="products-error"></div>
+    </div>
+  </div>
+
+  <div style="padding:16px 20px 36px;flex-shrink:0" id="products-cta" style="display:none">
+    <button class="btn btn-primary" id="try-on-btn" onclick="startAR()" disabled>
+      ✦ Try on with AR camera
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCREEN 5: AR ═══════════════════════════════════ -->
+<div class="screen" id="s-ar">
+  <div class="ar-loading" id="ar-loading">
+    <div class="spinner"></div>
+    <p id="ar-loading-text">Starting camera…</p>
+  </div>
+
+  <video id="ar-video" autoplay playsinline muted></video>
+  <canvas id="ar-canvas"></canvas>
+
+  <div class="ar-overlay-top">
+    <button class="back-btn" style="color:rgba(255,255,255,0.7)" onclick="stopAR()">← Exit</button>
+    <div class="ar-status" id="ar-status">Loading…</div>
+    <div class="logo" style="font-size:15px"><span>✦</span> AR</div>
+  </div>
+
+  <div class="ar-overlay-bottom">
+    <div class="ar-product-name" id="ar-product-name">Lip color</div>
+    <div class="ar-shade-name" id="ar-shade-name">–</div>
+    <div class="ar-color-row" id="ar-color-row"></div>
+    <div class="ar-intensity">
+      <label style="font-size:12px;color:rgba(255,255,255,0.45)">Intensity</label>
+      <input type="range" id="ar-intensity" min="10" max="90" value="55" step="1" oninput="updateIntensity(this.value)">
+      <span id="ar-intensity-val" style="font-size:12px;color:rgba(255,255,255,0.45);width:32px;text-align:right">55%</span>
+    </div>
+    <button class="btn btn-ghost" onclick="stopAR()" style="font-size:14px">Exit AR</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SCRIPTS ═══════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script>
+
+// ── STATE ──
+const state = {
+  apiKey: '',
+  imageBase64: '',
+  imageMime: 'image/jpeg',
+  analysis: null,
+  selectedCat: 'makeup',
+  selectedChips: ['Lipstick'],
+  products: [],
+  selectedProduct: null,
+  arColor: null,
+  arOpacity: 0.55,
+  arCamera: null,
+  arFaceMesh: null,
+};
+
+const CHIPS = {
+  makeup: ['Lipstick','Blush','Eyeshadow','Eyeliner','Foundation'],
+  fashion: ['Dress','T-shirt','Jacket','Sweater','Accessories'],
+  hair: ['Hair color','Shampoo','Treatment','Styling'],
+  skincare: ['Moisturizer','Serum','SPF','Toner'],
+};
+
+// ── NAV ──
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ── FILE UPLOAD ──
+const fileInput = document.getElementById('file-input');
+const previewImg = document.getElementById('preview-img');
+const uploadArea = document.getElementById('upload-area');
+const placeholder = document.getElementById('upload-placeholder');
+const analyzeBtn = document.getElementById('analyze-btn');
+const apiKeyInput = document.getElementById('api-key-input');
+
+fileInput.addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  state.imageMime = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    state.imageBase64 = dataUrl.split(',')[1];
+    previewImg.src = dataUrl;
+    previewImg.style.display = 'block';
+    placeholder.style.display = 'none';
+    checkReady();
+  };
+  reader.readAsDataURL(file);
+});
+
+apiKeyInput.addEventListener('input', () => {
+  state.apiKey = apiKeyInput.value.trim();
+  checkReady();
+});
+
+function checkReady() {
+  analyzeBtn.disabled = !(state.imageBase64 && state.apiKey);
+}
+
+// ── ANALYSIS ──
+async function startAnalysis() {
+  goTo('s-analysis');
+  document.getElementById('analyzing-state').style.display = 'block';
+  document.getElementById('analysis-result').style.display = 'none';
+  document.getElementById('analysis-cta').style.display = 'none';
+
+  const statuses = ['Reading skin tone & undertones…','Mapping eye and hair color…','Building your color season…','Generating palette recommendations…'];
+  let si = 0;
+  const statusEl = document.getElementById('analysis-status');
+  const ticker = setInterval(() => {
+    si = (si + 1) % statuses.length;
+    statusEl.textContent = statuses[si];
+  }, 1800);
+
+  try {
+    const prompt = `You are an expert color analyst. Analyze this person's face and provide a detailed color season analysis.
+
+Respond ONLY with a valid JSON object (no markdown, no backticks) with this exact structure:
+{
+  "season": "string (e.g. Soft Autumn, True Spring, Deep Winter, etc.)",
+  "undertone": "string (warm/cool/neutral)",
+  "skinTone": "string (fair/light/medium/tan/deep)",
+  "contrast": "string (low/medium/high)",
+  "eyeColor": "string",
+  "hairColor": "string",
+  "description": "string (2-3 sentences describing this person's coloring and what makes their season special)",
+  "bestColors": [
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"}
+  ],
+  "avoidColors": [
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"}
+  ],
+  "neutrals": [
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"},
+    {"hex":"#hex","name":"color name"}
+  ],
+  "lipShades": [
+    {"hex":"#hex","name":"shade name"},
+    {"hex":"#hex","name":"shade name"},
+    {"hex":"#hex","name":"shade name"},
+    {"hex":"#hex","name":"shade name"},
+    {"hex":"#hex","name":"shade name"}
+  ]
+}`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: state.imageMime, data: state.imageBase64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    clearInterval(ticker);
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const raw = data.content.find(b => b.type === 'text')?.text || '';
+    const clean = raw.replace(/```json|```/g,'').trim();
+    state.analysis = JSON.parse(clean);
+    renderAnalysis();
+
+  } catch(e) {
+    clearInterval(ticker);
+    document.getElementById('analyzing-state').style.display = 'none';
+    document.getElementById('analysis-result').style.display = 'block';
+    const errEl = document.getElementById('analysis-error');
+    errEl.style.display = 'block';
+    errEl.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderAnalysis() {
+  const a = state.analysis;
+  document.getElementById('analyzing-state').style.display = 'none';
+  document.getElementById('analysis-result').style.display = 'block';
+
+  document.getElementById('result-photo').src = 'data:' + state.imageMime + ';base64,' + state.imageBase64;
+
+  document.getElementById('season-badge-wrap').innerHTML =
+    `<div class="season-badge">✦ ${a.season} · ${a.undertone}</div>`;
+
+  document.getElementById('ai-desc-wrap').innerHTML =
+    `<div class="ai-desc">${a.description}</div>`;
+
+  const grid = document.getElementById('result-grid');
+  grid.innerHTML = `
+    <div class="result-card">
+      <div class="result-card-title">Best colors</div>
+      <div class="swatch-wrap">${a.bestColors.map(c=>`<div class="swatch" style="background:${c.hex}" title="${c.name}"></div>`).join('')}</div>
+    </div>
+    <div class="result-card">
+      <div class="result-card-title">Avoid</div>
+      <div class="swatch-wrap">${a.avoidColors.map(c=>`<div class="swatch" style="background:${c.hex}" title="${c.name}"></div>`).join('')}</div>
+    </div>
+    <div class="result-card">
+      <div class="result-card-title">Your features</div>
+      <div class="trait-wrap">
+        <span class="trait">${a.skinTone} skin</span>
+        <span class="trait">${a.eyeColor} eyes</span>
+        <span class="trait">${a.contrast} contrast</span>
+      </div>
+    </div>
+    <div class="result-card">
+      <div class="result-card-title">Best neutrals</div>
+      <div class="swatch-wrap">${a.neutrals.map(c=>`<div class="swatch" style="background:${c.hex}" title="${c.name}"></div>`).join('')}</div>
+    </div>
+  `;
+
+  document.getElementById('analysis-cta').style.display = 'block';
+}
+
+// ── SHOP ──
+let selectedCat = 'makeup';
+
+function selectCat(cat) {
+  selectedCat = cat;
+  ['makeup','fashion','hair','skincare'].forEach(c => {
+    document.getElementById('cat-'+c).classList.toggle('sel', c===cat);
+  });
+  state.selectedChips = [CHIPS[cat][0]];
+  renderChips(cat);
+}
+
+function renderChips(cat) {
+  const row = document.getElementById('chip-row');
+  row.innerHTML = CHIPS[cat].map(c =>
+    `<div class="chip ${state.selectedChips.includes(c)?'sel':''}" onclick="toggleChip(this,'${c}')">${c}</div>`
+  ).join('');
+}
+
+function toggleChip(el, val) {
+  if (state.selectedChips.includes(val)) {
+    if (state.selectedChips.length > 1) state.selectedChips = state.selectedChips.filter(v=>v!==val);
+  } else {
+    state.selectedChips.push(val);
+  }
+  renderChips(selectedCat);
+}
+
+renderChips('makeup');
+
+// ── PRODUCT SEARCH via Claude ──
+async function findProducts() {
+  state.selectedCat = selectedCat;
+  goTo('s-products');
+  document.getElementById('searching-state').style.display = 'block';
+  document.getElementById('products-result').style.display = 'none';
+  document.getElementById('products-cta').style.display = 'none';
+
+  const a = state.analysis;
+  const statusEl = document.getElementById('search-status');
+  const statuses = ['Finding perfect shades…','Matching to your palette…','Selecting top products…'];
+  let si = 0;
+  const ticker = setInterval(() => { si=(si+1)%statuses.length; statusEl.textContent=statuses[si]; }, 1600);
+
+  const paletteDesc = a.bestColors.map(c=>c.name).join(', ');
+  const lipDesc = a.lipShades ? a.lipShades.map(c=>c.name+' ('+c.hex+')').join(', ') : '';
+
+  const prompt = `You are a beauty and fashion product expert. Based on this person's color analysis, recommend specific real products.
+
+Color season: ${a.season}
+Undertone: ${a.undertone}
+Skin tone: ${a.skinTone}
+Best palette colors: ${paletteDesc}
+Best lip shades: ${lipDesc}
+Shopping for: ${state.selectedChips.join(', ')} (category: ${state.selectedCat})
+
+Respond ONLY with a valid JSON array (no markdown, no backticks) of exactly 5 product recommendations:
+[
+  {
+    "brand": "Brand name",
+    "name": "Product name",
+    "shade": "Shade name",
+    "hex": "#hexcolor of the shade",
+    "price": "€XX",
+    "reason": "One sentence why this matches their palette",
+    "sephora_url": "https://www.sephora.com/search?keyword=BRAND+PRODUCTNAME"
+  }
+]
+
+Use real, currently available products from brands like Charlotte Tilbury, NARS, MAC, Fenty Beauty, Rare Beauty, Urban Decay, Too Faced, Lancôme, YSL, Armani Beauty, etc. Make the hex color accurate to the actual shade.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    clearInterval(ticker);
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const raw = data.content.find(b=>b.type==='text')?.text || '';
+    const clean = raw.replace(/```json|```/g,'').trim();
+    state.products = JSON.parse(clean);
+    renderProducts();
+
+  } catch(e) {
+    clearInterval(ticker);
+    document.getElementById('searching-state').style.display = 'none';
+    document.getElementById('products-result').style.display = 'block';
+    const errEl = document.getElementById('products-error');
+    errEl.style.display = 'block';
+    errEl.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderProducts() {
+  document.getElementById('searching-state').style.display = 'none';
+  document.getElementById('products-result').style.display = 'block';
+  document.getElementById('products-cta').style.display = 'block';
+
+  const a = state.analysis;
+  document.getElementById('products-subtitle').textContent =
+    `${state.products.length} products matched to your ${a.season} palette`;
+
+  const list = document.getElementById('product-list');
+  list.innerHTML = '';
+
+  state.products.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'product-item' + (i===0?' sel':'');
+    el.innerHTML = `
+      <div class="product-color-preview" style="background:${p.hex}"></div>
+      <div class="product-info">
+        <div class="product-brand">${p.brand}</div>
+        <div class="product-name">${p.name}</div>
+        <div class="product-shade">${p.shade}</div>
+        <div class="match-badge">✓ Palette match</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+        <div class="product-price">${p.price}</div>
+        <a href="${p.sephora_url}" target="_blank" style="font-size:11px;color:var(--hint);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:3px 7px">View ↗</a>
+      </div>
+    `;
+    el.onclick = () => {
+      document.querySelectorAll('.product-item').forEach(e=>e.classList.remove('sel'));
+      el.classList.add('sel');
+      state.selectedProduct = p;
+      state.arColor = p.hex;
+      document.getElementById('try-on-btn').disabled = false;
+    };
+    if (i===0) { state.selectedProduct = p; state.arColor = p.hex; }
+    list.appendChild(el);
+  });
+
+  document.getElementById('try-on-btn').disabled = false;
+
+  // populate AR swatches from lip shades
+  const lipShades = state.analysis.lipShades || state.products.map(p=>({hex:p.hex,name:p.shade}));
+  state.arSwatches = lipShades;
+}
+
+// ── AR ──
+const LIP_UPPER = [61,185,40,39,37,0,267,269,270,409,291,375,321,405,314,17,84,181,91,146];
+const LIP_LOWER = [61,146,91,181,84,17,314,405,321,375,291,409,270,269,267,0,37,39,40,185];
+
+function hexToRgb(hex) {
+  const h = hex.replace('#','');
+  return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) };
+}
+
+async function startAR() {
+  goTo('s-ar');
+  document.getElementById('ar-loading').style.display = 'flex';
+  document.getElementById('ar-loading-text').textContent = 'Starting camera…';
+
+  const video = document.getElementById('ar-video');
+  const canvas = document.getElementById('ar-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // build AR swatch row
+  buildArSwatches();
+
+  // update shade name
+  if (state.selectedProduct) {
+    document.getElementById('ar-product-name').textContent = state.selectedProduct.brand + ' · ' + state.selectedProduct.name;
+    document.getElementById('ar-shade-name').textContent = state.selectedProduct.shade;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+  } catch(e) {
+    document.getElementById('ar-loading-text').textContent = 'Camera access denied. Please allow camera in Safari settings.';
+    return;
+  }
+
+  document.getElementById('ar-loading-text').textContent = 'Loading face detection…';
+
+  const faceMesh = new FaceMesh({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`
+  });
+  faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+
+  faceMesh.onResults(results => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    if (results.multiFaceLandmarks?.length > 0) {
+      document.getElementById('ar-status').textContent = 'Face detected';
+      document.getElementById('ar-status').className = 'ar-status on';
+      drawLips(ctx, results.multiFaceLandmarks[0], canvas.width, canvas.height);
+    } else {
+      document.getElementById('ar-status').textContent = 'Point at your face';
+      document.getElementById('ar-status').className = 'ar-status';
+    }
+  });
+
+  await faceMesh.initialize();
+  document.getElementById('ar-loading').style.display = 'none';
+  state.arFaceMesh = faceMesh;
+
+  state.arCamera = new Camera(video, {
+    onFrame: async () => { await faceMesh.send({image: video}); },
+    width: 1280, height: 720
+  });
+  state.arCamera.start();
+}
+
+function drawLips(ctx, landmarks, w, h) {
+  if (!state.arColor) return;
+  const {r,g,b} = hexToRgb(state.arColor);
+
+  function pt(i) { return [landmarks[i].x*w, landmarks[i].y*h]; }
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = state.arOpacity;
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+
+  ctx.beginPath();
+  const outer = LIP_UPPER.map(i=>pt(i));
+  ctx.moveTo(outer[0][0],outer[0][1]);
+  outer.slice(1).forEach(p=>ctx.lineTo(p[0],p[1]));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.globalAlpha = 1;
+  const INNER = [78,95,88,178,87,14,317,402,318,324,308,415,310,311,312,13,82,81,80,191];
+  ctx.beginPath();
+  const inner = INNER.map(i=>pt(i));
+  ctx.moveTo(inner[0][0],inner[0][1]);
+  inner.slice(1).forEach(p=>ctx.lineTo(p[0],p[1]));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function buildArSwatches() {
+  const row = document.getElementById('ar-color-row');
+  row.innerHTML = '';
+  const swatches = state.arSwatches || state.products.map(p=>({hex:p.hex,name:p.shade}));
+  swatches.forEach((s,i) => {
+    const el = document.createElement('div');
+    el.className = 'ar-swatch' + (i===0?' sel':'');
+    el.style.background = s.hex;
+    el.title = s.name;
+    el.onclick = () => {
+      document.querySelectorAll('.ar-swatch').forEach(e=>e.classList.remove('sel'));
+      el.classList.add('sel');
+      state.arColor = s.hex;
+      document.getElementById('ar-shade-name').textContent = s.name;
+    };
+    row.appendChild(el);
+  });
+  if (swatches.length > 0) state.arColor = swatches[0].hex;
+}
+
+function updateIntensity(val) {
+  state.arOpacity = parseInt(val) / 100;
+  document.getElementById('ar-intensity-val').textContent = val + '%';
+}
+
+function stopAR() {
+  if (state.arCamera) { state.arCamera.stop(); state.arCamera = null; }
+  const video = document.getElementById('ar-video');
+  if (video.srcObject) { video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
+  if (state.arFaceMesh) { state.arFaceMesh.close(); state.arFaceMesh = null; }
+  const canvas = document.getElementById('ar-canvas');
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  goTo('s-products');
+}
+
+</script>
+</body>
+</html>
